@@ -1,5 +1,5 @@
 // eslint-disable-next-line
-import { Component, Event, EventEmitter, Prop, h } from '@stencil/core';
+import { Component, Event, EventEmitter, Prop, h, State } from '@stencil/core';
 import { IconChevronUpThick } from '../icons/icon-chevron-up-thick';
 import { IconChevronDownThick } from '../icons/icon-chevron-down-thick';
 
@@ -27,13 +27,21 @@ export class ModusAccordionItem {
   /** An event that fires on every accordion open.  */
   @Event() opened: EventEmitter;
 
+  @State() isCollapsing;
+
   classBySize: Map<string, string> = new Map([
     ['condensed', 'small'],
     ['standard', 'standard'],
   ]);
 
+  accordionContent: HTMLDivElement;
+  transitionTimeout;
+  transitionEnd = () => this.handleTransitionEnd();
+
   handleHeaderClick(): void {
-    if (this.disabled) { return; }
+    if (this.disabled) {
+      return;
+    }
 
     this.expanded = !this.expanded;
     if (this.expanded) {
@@ -41,10 +49,25 @@ export class ModusAccordionItem {
     } else {
       this.closed.emit();
     }
+
+    this.transitionTimeout = window.setTimeout(() => this.handleTransitionStart());
+  }
+
+  handleTransitionStart() {
+    this.isCollapsing = true;
+    this.accordionContent?.addEventListener('transitionend', this.transitionEnd);
+  }
+
+  handleTransitionEnd() {
+    this.isCollapsing = false;
+    clearTimeout(this.transitionTimeout);
+    this.accordionContent?.removeEventListener('transitionend', this.transitionEnd);
   }
 
   handleKeydown(event: KeyboardEvent): void {
-    if (event.code !== 'Enter') { return; }
+    if (event.code !== 'Enter') {
+      return;
+    }
 
     this.handleHeaderClick();
   }
@@ -53,7 +76,7 @@ export class ModusAccordionItem {
     const sizeClass = `${this.classBySize.get(this.size)}`;
     const disabledClass = `${this.disabled ? 'disabled' : ''}`;
     const iconSize = this.size === 'standard' ? '24' : '20';
-    const bodyClass = `body ${sizeClass} ${this.expanded ? 'expanded' : ''}`;
+    const bodyClass = `body ${sizeClass}${this.expanded ? ' expanded' : ''}${this.isCollapsing ? ' collapsing' : ''}`;
 
     return (
       <div aria-disabled={this.disabled ? 'true' : undefined} aria-expanded={this.expanded} class="accordion-item">
@@ -61,7 +84,7 @@ export class ModusAccordionItem {
           <span class="title">{this.headerText}</span>
           {this.expanded ? <IconChevronUpThick size={iconSize}></IconChevronUpThick> : <IconChevronDownThick size={iconSize}></IconChevronDownThick>}
         </div>
-        <div class={bodyClass}>
+        <div class={bodyClass} ref={(el) => (this.accordionContent = el as HTMLDivElement)}>
           <slot />
         </div>
       </div>
